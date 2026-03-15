@@ -56,7 +56,7 @@ def smart_paste():
         upper = line.upper()
         if 'TOTAL' in upper and total is None:
             total = extract_from_line(line)
-        elif 'VEEC' in upper and veec is None:
+        elif 'VICTORIAN' in upper and veec is None:
             val = extract_from_line(line)
             # amount is sometimes on the line below the label
             veec = val if val else find_next_amount(lines, i)
