@@ -1,14 +1,5 @@
-# PyInstaller build artifacts
+__pycache__/
+*.pyc
 dist/
 build/
 *.spec
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Other scripts not part of this project
-number_cleaner.py
-run.bat
-run_calc.bat
-build.bat
