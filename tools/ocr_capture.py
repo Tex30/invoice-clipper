@@ -18,6 +18,7 @@ except ImportError:
 
 _PACKAGES = [
     "Pillow", "mss", "winrt-runtime",
+    "winrt-Windows.Foundation",
     "winrt-Windows.Media.Ocr", "winrt-Windows.Storage",
     "winrt-Windows.Graphics.Imaging",
 ]
