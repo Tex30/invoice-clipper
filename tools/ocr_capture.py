@@ -16,12 +16,20 @@ try:
 except ImportError:
     OCR_AVAILABLE = False
 
+try:
+    from pynput import keyboard as kb
+    HOTKEY_AVAILABLE = True
+except ImportError:
+    HOTKEY_AVAILABLE = False
+
 _PACKAGES = [
-    "Pillow", "mss", "winrt-runtime",
+    "Pillow", "mss", "pynput", "winrt-runtime",
     "winrt-Windows.Foundation",
     "winrt-Windows.Media.Ocr", "winrt-Windows.Storage",
     "winrt-Windows.Graphics.Imaging",
 ]
+
+DEFAULT_HOTKEY = "<ctrl>+<shift>+q"
 
 
 def build_tab(parent):
@@ -46,10 +54,15 @@ def build_tab(parent):
 
     # -- capture flow --
 
+    _busy = {"capturing": False}
+
     def start_capture():
+        if _busy["capturing"]:
+            return
         if not OCR_AVAILABLE:
             ocr_status.config(text="OCR packages not installed — click Install", fg=RED)
             return
+        _busy["capturing"] = True
         ocr_status.config(text="")
         root.withdraw()
         root.after(300, _capture_screen)
@@ -72,7 +85,7 @@ def build_tab(parent):
 
     def _show_selector(full_shot, scale, vx, vy, sw, sh):
         sel = tk.Toplevel()
-        sel.geometry(f"{sw}x{sh}+{vx}+{vy}")
+        sel.withdraw()
         sel.overrideredirect(True)
         sel.attributes("-topmost", True)
         sel.attributes("-alpha", 0.25)
@@ -84,6 +97,9 @@ def build_tab(parent):
                  text="  Click and drag to select region   \u2022   Esc to cancel  ",
                  bg="#1a1a1a", fg="#cccccc", font=("Segoe UI", 10),
                  padx=10, pady=5).place(relx=0.5, rely=0.02, anchor="n")
+
+        sel.geometry(f"{sw}x{sh}+{vx}+{vy}")
+        sel.deiconify()
 
         state = {"start": None, "rect": None}
 
@@ -110,6 +126,7 @@ def build_tab(parent):
             y0, y1 = min(y0, y1), max(y0, y1)
             sel.destroy()
             root.deiconify()
+            _busy["capturing"] = False
             if x1 - x0 < 10 or y1 - y0 < 10:
                 ocr_status.config(text="Selection too small — try again", fg=RED)
                 return
@@ -122,6 +139,7 @@ def build_tab(parent):
         def on_escape(e):
             sel.destroy()
             root.deiconify()
+            _busy["capturing"] = False
             ocr_status.config(text="Cancelled", fg=FG_DIM)
 
         canvas.bind("<ButtonPress-1>",   on_press)
@@ -195,14 +213,15 @@ def build_tab(parent):
         threading.Thread(target=_do_install, daemon=True).start()
 
     def _do_install():
+        _no_window = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
         try:
             r = subprocess.run(
                 [sys.executable, "-m", "pip", "install"] + _PACKAGES,
-                capture_output=True, text=True)
+                capture_output=True, text=True, **_no_window)
             if r.returncode != 0:
                 r = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "--user"] + _PACKAGES,
-                    capture_output=True, text=True)
+                    capture_output=True, text=True, **_no_window)
             if r.returncode != 0:
                 raise RuntimeError(r.stderr[-400:])
             root.after(0, _install_ok)
@@ -215,7 +234,9 @@ def build_tab(parent):
         ocr_status.config(text="Installed — click Restart to activate", fg=GREEN2)
         btn_install.config(text="Restart App", state="normal", bg=GREEN2,
                            command=lambda: (root.destroy(),
-                                            subprocess.Popen([sys.executable] + sys.argv)))
+                                            subprocess.Popen(
+                                                [sys.executable] + sys.argv,
+                                                creationflags=0x08000000 if sys.platform == "win32" else 0)))
 
     def _install_fail(detail=""):
         install_bar.stop()
@@ -223,6 +244,155 @@ def build_tab(parent):
         short = detail.strip().splitlines()[-1][:80] if detail.strip() else "unknown error"
         ocr_status.config(text=f"Install failed: {short}", fg=RED)
         btn_install.config(text="Install", state="normal")
+
+    # -- global hotkey --
+
+    _MODIFIERS = {"ctrl_l", "ctrl_r", "shift", "shift_l", "shift_r",
+                  "alt_l", "alt_r", "alt_gr", "cmd", "cmd_l", "cmd_r"}
+    _MOD_DISPLAY = {"ctrl_l": "Ctrl", "ctrl_r": "Ctrl", "shift": "Shift",
+                    "shift_l": "Shift", "shift_r": "Shift",
+                    "alt_l": "Alt", "alt_r": "Alt", "alt_gr": "AltGr",
+                    "cmd": "Win", "cmd_l": "Win", "cmd_r": "Win"}
+    _MOD_PYNPUT = {"ctrl_l": "<ctrl>", "ctrl_r": "<ctrl>",
+                   "shift": "<shift>", "shift_l": "<shift>", "shift_r": "<shift>",
+                   "alt_l": "<alt>", "alt_r": "<alt>", "alt_gr": "<alt_gr>",
+                   "cmd": "<cmd>", "cmd_l": "<cmd>", "cmd_r": "<cmd>"}
+
+    hk = {"listener": None, "combo": DEFAULT_HOTKEY, "display": "Ctrl + Shift + Q",
+          "recording": False, "pressed": set(), "rec_listener": None}
+
+    def _key_name(key):
+        if hasattr(key, "name"):
+            return key.name
+        if hasattr(key, "char") and key.char:
+            return key.char.lower()
+        return None
+
+    def _display_combo(keys):
+        mods = sorted(k for k in keys if k in _MODIFIERS)
+        regular = sorted(k for k in keys if k not in _MODIFIERS)
+        parts, seen = [], set()
+        for m in mods:
+            nice = _MOD_DISPLAY.get(m, m.title())
+            if nice not in seen:
+                parts.append(nice)
+                seen.add(nice)
+        for r in regular:
+            parts.append(r.upper() if len(r) == 1 else r.replace("_", " ").title())
+        return " + ".join(parts)
+
+    def _to_pynput(keys):
+        mods = sorted(k for k in keys if k in _MODIFIERS)
+        regular = sorted(k for k in keys if k not in _MODIFIERS)
+        parts, seen = [], set()
+        for m in mods:
+            token = _MOD_PYNPUT.get(m, f"<{m}>")
+            if token not in seen:
+                parts.append(token)
+                seen.add(token)
+        for r in regular:
+            parts.append(r if len(r) == 1 else f"<{r}>")
+        return "+".join(parts)
+
+    def _hotkey_fired():
+        root.after(0, start_capture)
+
+    def _start_listener(combo):
+        _stop_listener()
+        if not HOTKEY_AVAILABLE:
+            return
+        try:
+            hotkey = kb.HotKey(kb.HotKey.parse(combo), _hotkey_fired)
+            listener = kb.Listener(
+                on_press=lambda k: hotkey.press(listener.canonical(k)),
+                on_release=lambda k: hotkey.release(listener.canonical(k)))
+            listener.daemon = True
+            listener.start()
+            hk["listener"] = listener
+            hk["combo"] = combo
+        except Exception:
+            pass
+
+    def _stop_listener():
+        if hk["listener"]:
+            hk["listener"].stop()
+            hk["listener"] = None
+
+    def _stop_recording():
+        hk["recording"] = False
+        if hk["rec_listener"]:
+            hk["rec_listener"].stop()
+            hk["rec_listener"] = None
+
+    def _start_recording():
+        if hk["recording"]:
+            _stop_recording()
+            hk_record.config(text=hk["display"], bg=BG2, fg=FG)
+            hk_toggle.config(state="normal")
+            hk_status.config(text="", fg=FG_DIM)
+            return
+        _stop_listener()
+        hk["recording"] = True
+        hk["pressed"] = set()
+        hk_record.config(text="Press keys...", bg="#e67e22", fg="white")
+        hk_status.config(text="Esc to cancel", fg=FG_DIM)
+        hk_toggle.config(state="disabled")
+
+        def on_press(key):
+            name = _key_name(key)
+            if name is None:
+                return
+            if name == "esc":
+                root.after(0, _cancel_recording)
+                return False
+            hk["pressed"].add(name)
+            root.after(0, lambda: hk_record.config(
+                text=_display_combo(hk["pressed"]) or "Press keys..."))
+
+        def on_release(key):
+            keys = hk["pressed"].copy()
+            if not keys:
+                return
+            has_mod = any(k in _MODIFIERS for k in keys)
+            has_key = any(k not in _MODIFIERS for k in keys)
+            if has_mod and has_key:
+                hk["recording"] = False
+                combo = _to_pynput(keys)
+                display = _display_combo(keys)
+                hk["combo"] = combo
+                hk["display"] = display
+                root.after(0, lambda: _finish_recording(display))
+                return False
+
+        rec = kb.Listener(on_press=on_press, on_release=on_release)
+        rec.daemon = True
+        rec.start()
+        hk["rec_listener"] = rec
+
+    def _cancel_recording():
+        _stop_recording()
+        hk_record.config(text=hk["display"], bg=BG2, fg=FG)
+        hk_toggle.config(text="Enable", bg=GREY, fg=FG_DIM, state="normal")
+        hk_status.config(text="Cancelled", fg=FG_DIM)
+
+    def _finish_recording(display):
+        _stop_recording()
+        hk_record.config(text=display, bg=BG2, fg=FG)
+        hk_toggle.config(text="Enable", bg=GREY, fg=FG_DIM, state="normal")
+        hk_status.config(text="Click Enable to activate", fg=FG_DIM)
+
+    def _on_hotkey_toggle():
+        if hk["listener"]:
+            _stop_listener()
+            hk_toggle.config(text="Enable", bg=GREY, fg=FG_DIM)
+            hk_status.config(text="Hotkey off", fg=FG_DIM)
+        else:
+            _start_listener(hk["combo"])
+            if hk["listener"]:
+                hk_toggle.config(text="Disable", bg=RED, fg="white")
+                hk_status.config(text="Active", fg=GREEN2)
+            else:
+                hk_status.config(text="Invalid combo", fg=RED)
 
     # -- layout --
 
@@ -249,3 +419,21 @@ def build_tab(parent):
     tk.Button(btns, text="Clear", command=_clear_ocr,
               bg=GREY, fg=FG_DIM, font=FONT_SM, relief="flat",
               padx=8, pady=3).pack(side="left", padx=(6, 0))
+
+    # hotkey row
+    if HOTKEY_AVAILABLE:
+        hk_frame = tk.Frame(parent, bg=BG)
+        hk_frame.pack(fill="x", padx=10, pady=(2, 10))
+        tk.Label(hk_frame, text="Hotkey", bg=BG, fg=FG_DIM,
+                 font=FONT_SM).pack(side="left")
+        hk_record = tk.Button(hk_frame, text="Ctrl + Shift + Q",
+                               command=_start_recording,
+                               bg=BG2, fg=FG, font=FONT_SM, relief="flat",
+                               padx=8, pady=2, cursor="hand2")
+        hk_record.pack(side="left", padx=(6, 0))
+        hk_toggle = tk.Button(hk_frame, text="Enable", command=_on_hotkey_toggle,
+                               bg=GREY, fg=FG_DIM, font=FONT_SM, relief="flat",
+                               padx=8, pady=2)
+        hk_toggle.pack(side="left", padx=(6, 0))
+        hk_status = tk.Label(hk_frame, text="", bg=BG, fg=FG_DIM, font=FONT_SM)
+        hk_status.pack(side="left", padx=(8, 0))
