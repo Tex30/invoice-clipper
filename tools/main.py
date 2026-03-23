@@ -12,7 +12,7 @@ except Exception:
 import tkinter as tk
 from tkinter import ttk
 from .theme import BG, BG2, FG, FG_DIM, GREY, FONT_SM
-from . import invoice_calc, ocr_capture
+from . import invoice_calc, ocr_capture, quick_list
 
 
 def main():
@@ -37,7 +37,8 @@ def main():
     nb.pack(fill="both", expand=True)
 
     for label, mod in [("  Invoice Calculator  ", invoice_calc),
-                       ("  OCR Capture  ",        ocr_capture)]:
+                       ("  OCR Capture  ",        ocr_capture),
+                       ("  Quick List  ",         quick_list)]:
         tab = tk.Frame(nb, bg=BG)
         nb.add(tab, text=label)
         mod.build_tab(tab)

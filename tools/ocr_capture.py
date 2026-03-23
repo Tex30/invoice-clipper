@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from tkinter import ttk
-import sys, os, asyncio, subprocess, threading, tempfile
+import sys, os, json, asyncio, subprocess, threading, tempfile
 from .theme import *
 
 try:
@@ -30,6 +30,24 @@ _PACKAGES = [
 ]
 
 DEFAULT_HOTKEY = "<ctrl>+<shift>+q"
+DEFAULT_DISPLAY = "Ctrl + Shift + Q"
+_CFG_PATH = os.path.join(os.path.dirname(__file__), "hotkey.json")
+
+
+def _load_cfg():
+    try:
+        with open(_CFG_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_cfg(combo, display, enabled):
+    try:
+        with open(_CFG_PATH, "w") as f:
+            json.dump({"combo": combo, "display": display, "enabled": enabled}, f)
+    except Exception:
+        pass
 
 
 def build_tab(parent):
@@ -258,7 +276,11 @@ def build_tab(parent):
                    "alt_l": "<alt>", "alt_r": "<alt>", "alt_gr": "<alt_gr>",
                    "cmd": "<cmd>", "cmd_l": "<cmd>", "cmd_r": "<cmd>"}
 
-    hk = {"listener": None, "combo": DEFAULT_HOTKEY, "display": "Ctrl + Shift + Q",
+    cfg = _load_cfg()
+    hk = {"listener": None,
+          "combo": cfg.get("combo", DEFAULT_HOTKEY),
+          "display": cfg.get("display", DEFAULT_DISPLAY),
+          "enabled": cfg.get("enabled", False),
           "recording": False, "pressed": set(), "rec_listener": None}
 
     def _key_name(key):
@@ -380,17 +402,20 @@ def build_tab(parent):
         hk_record.config(text=display, bg=BG2, fg=FG)
         hk_toggle.config(text="Enable", bg=GREY, fg=FG_DIM, state="normal")
         hk_status.config(text="Click Enable to activate", fg=FG_DIM)
+        _save_cfg(hk["combo"], hk["display"], False)
 
     def _on_hotkey_toggle():
         if hk["listener"]:
             _stop_listener()
             hk_toggle.config(text="Enable", bg=GREY, fg=FG_DIM)
             hk_status.config(text="Hotkey off", fg=FG_DIM)
+            _save_cfg(hk["combo"], hk["display"], False)
         else:
             _start_listener(hk["combo"])
             if hk["listener"]:
                 hk_toggle.config(text="Disable", bg=RED, fg="white")
                 hk_status.config(text="Active", fg=GREEN2)
+                _save_cfg(hk["combo"], hk["display"], True)
             else:
                 hk_status.config(text="Invalid combo", fg=RED)
 
@@ -426,7 +451,7 @@ def build_tab(parent):
         hk_frame.pack(fill="x", padx=10, pady=(2, 10))
         tk.Label(hk_frame, text="Hotkey", bg=BG, fg=FG_DIM,
                  font=FONT_SM).pack(side="left")
-        hk_record = tk.Button(hk_frame, text="Ctrl + Shift + Q",
+        hk_record = tk.Button(hk_frame, text=hk["display"],
                                command=_start_recording,
                                bg=BG2, fg=FG, font=FONT_SM, relief="flat",
                                padx=8, pady=2, cursor="hand2")
@@ -437,3 +462,10 @@ def build_tab(parent):
         hk_toggle.pack(side="left", padx=(6, 0))
         hk_status = tk.Label(hk_frame, text="", bg=BG, fg=FG_DIM, font=FONT_SM)
         hk_status.pack(side="left", padx=(8, 0))
+
+        # restore from previous session
+        if hk["enabled"]:
+            _start_listener(hk["combo"])
+            if hk["listener"]:
+                hk_toggle.config(text="Disable", bg=RED, fg="white")
+                hk_status.config(text="Active", fg=GREEN2)
