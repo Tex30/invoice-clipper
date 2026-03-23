@@ -1,5 +1,3 @@
-"""OCR Capture — select a screen region, extract text using Windows native OCR."""
-
 import tkinter as tk
 from tkinter import ttk
 import sys, os, json, asyncio, subprocess, threading, tempfile
@@ -69,8 +67,6 @@ def build_tab(parent):
     ocr_box = tk.Text(parent, bg=BG2, fg=FG, font=FONT_SM,
                       relief="flat", wrap="word", width=44, height=3,
                       padx=8, pady=6, insertbackground=FG)
-
-    # -- capture flow --
 
     _busy = {"capturing": False}
 
@@ -166,8 +162,6 @@ def build_tab(parent):
         sel.bind("<Escape>",             on_escape)
         sel.focus_force()
 
-    # -- WinRT OCR --
-
     async def _ocr_async(path):
         engine = OcrEngine.try_create_from_user_profile_languages()
         if engine is None:
@@ -221,8 +215,6 @@ def build_tab(parent):
         ocr_box.delete("1.0", tk.END)
         ocr_status.config(text="")
 
-    # -- installer --
-
     def run_install():
         btn_install.config(state="disabled", text="Installing...")
         ocr_status.config(text="Installing — this may take a minute...", fg="white")
@@ -262,8 +254,6 @@ def build_tab(parent):
         short = detail.strip().splitlines()[-1][:80] if detail.strip() else "unknown error"
         ocr_status.config(text=f"Install failed: {short}", fg=RED)
         btn_install.config(text="Install", state="normal")
-
-    # -- global hotkey --
 
     _MODIFIERS = {"ctrl_l", "ctrl_r", "shift", "shift_l", "shift_r",
                   "alt_l", "alt_r", "alt_gr", "cmd", "cmd_l", "cmd_r"}
@@ -419,8 +409,6 @@ def build_tab(parent):
             else:
                 hk_status.config(text="Invalid combo", fg=RED)
 
-    # -- layout --
-
     tk.Button(top, text="Capture Text", command=start_capture,
               bg=GREEN2, fg="white", font=FONT, relief="flat",
               padx=12, pady=5).pack(side="left")
@@ -445,7 +433,6 @@ def build_tab(parent):
               bg=GREY, fg=FG_DIM, font=FONT_SM, relief="flat",
               padx=8, pady=3).pack(side="left", padx=(6, 0))
 
-    # hotkey row
     if HOTKEY_AVAILABLE:
         hk_frame = tk.Frame(parent, bg=BG)
         hk_frame.pack(fill="x", padx=10, pady=(2, 10))
@@ -463,7 +450,6 @@ def build_tab(parent):
         hk_status = tk.Label(hk_frame, text="", bg=BG, fg=FG_DIM, font=FONT_SM)
         hk_status.pack(side="left", padx=(8, 0))
 
-        # restore from previous session
         if hk["enabled"]:
             _start_listener(hk["combo"])
             if hk["listener"]:

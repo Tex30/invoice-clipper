@@ -1,5 +1,3 @@
-"""Shared colours and fonts."""
-
 BG      = "#1e1e1e"
 BG2     = "#252525"
 FG      = "#cccccc"

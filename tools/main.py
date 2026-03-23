@@ -1,5 +1,3 @@
-"""Main launcher — tabbed window that loads each tool."""
-
 import ctypes
 try:
     ctypes.windll.shcore.SetProcessDpiAwareness(1)

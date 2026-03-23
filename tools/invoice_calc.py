@@ -1,5 +1,3 @@
-"""Invoice Calculator — paste invoice text, extract Total and VEEC, calculate the difference."""
-
 import tkinter as tk
 import re
 from .theme import *

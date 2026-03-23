@@ -1,5 +1,3 @@
-"""Quick List — paste a column of codes, get a Copy button next to each row."""
-
 import tkinter as tk
 from .theme import *
 
@@ -60,7 +58,6 @@ def build_tab(parent):
             w.destroy()
         status.config(text="")
 
-    # layout
     tk.Button(top, text="Paste List", command=paste_list,
               bg=GREEN2, fg="white", font=FONT, relief="flat",
               padx=12, pady=5).pack(side="left")
