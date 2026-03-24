@@ -6,6 +6,7 @@ from .theme import *
 try:
     import mss
     from PIL import Image as PilImage
+    import winrt.windows.foundation
     from winrt.windows.media.ocr import OcrEngine
     from winrt.windows.storage import StorageFile, FileAccessMode
     from winrt.windows.graphics.imaging import (
