@@ -415,11 +415,11 @@ def build_tab(parent):
               padx=12, pady=5).pack(side="left")
     ocr_status.pack(side="left", padx=10)
 
-    btn_install = tk.Button(top, text="Install", command=run_install,
+    install_label = "Install" if not OCR_AVAILABLE else "Reinstall"
+    btn_install = tk.Button(top, text=install_label, command=run_install,
                             bg=BLUE, fg="white", font=FONT_SM, relief="flat",
                             padx=8, pady=5)
-    if not OCR_AVAILABLE:
-        btn_install.pack(side="left")
+    btn_install.pack(side="left")
 
     ocr_box.pack(fill="x", padx=10, pady=(0, 4))
 
