@@ -7,6 +7,11 @@ try:
     import mss
     from PIL import Image as PilImage
     import winrt.windows.foundation
+    import winrt.windows.foundation.collections
+    import winrt.windows.globalization
+    import winrt.windows.media
+    import winrt.windows.graphics
+    import winrt.windows.storage.streams
     from winrt.windows.media.ocr import OcrEngine
     from winrt.windows.storage import StorageFile, FileAccessMode
     from winrt.windows.graphics.imaging import (
@@ -24,8 +29,14 @@ except ImportError:
 _PACKAGES = [
     "Pillow", "mss", "pynput", "winrt-runtime",
     "winrt-Windows.Foundation",
-    "winrt-Windows.Media.Ocr", "winrt-Windows.Storage",
+    "winrt-Windows.Foundation.Collections",
+    "winrt-Windows.Globalization",
+    "winrt-Windows.Media",
+    "winrt-Windows.Media.Ocr",
+    "winrt-Windows.Graphics",
     "winrt-Windows.Graphics.Imaging",
+    "winrt-Windows.Storage",
+    "winrt-Windows.Storage.Streams",
 ]
 
 DEFAULT_HOTKEY = "<ctrl>+<shift>+q"
